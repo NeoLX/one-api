@@ -19,6 +19,14 @@ export const CHANNEL_OPTIONS = [
     color: 'orange',
     description: 'Gemini OpenAI 兼容格式',
   },
+  {
+    key: 52,
+    text: 'OpenCode Go',
+    value: 52,
+    color: 'blue',
+    description:
+      'OpenCode Go 订阅套餐，OpenAI 兼容。必须在「自定义请求头」里加 x-opencode-session，否则上游返回 400 MissingSessionID',
+  },
   { key: 28, text: 'Mistral AI', value: 28, color: 'orange' },
   { key: 41, text: 'Novita', value: 41, color: 'purple' },
   {

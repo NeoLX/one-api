@@ -204,6 +204,33 @@ func GetUserAvailableModels(c *gin.Context) {
 		})
 		return
 	}
+	// 再与用户级「代理」白名单求交，让令牌模型下拉与接入信息反映真实可用范围
+	proxyRules, err := model.CacheGetUserProxyRules(id)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	if proxyRules != nil {
+		providerModels, err := model.GetGroupProviderModels(userGroup)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+		allowed := model.AllowedModelsForUser(proxyRules, providerModels)
+		filtered := make([]string, 0, len(models))
+		for _, modelName := range models {
+			if allowed[modelName] {
+				filtered = append(filtered, modelName)
+			}
+		}
+		models = filtered
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",

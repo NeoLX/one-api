@@ -1,0 +1,10 @@
+.git
+.gitignore
+.DS_Store
+web/*/node_modules
+web/*/build
+logs
+data
+upload
+*.db
+*.db-journal

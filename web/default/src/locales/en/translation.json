@@ -1,8 +1,9 @@
 {
   "header": {
     "home": "Home",
-    "channel": "Channel",
-    "token": "Token",
+    "channel": "Providers & Models",
+    "proxy": "Proxy",
+    "token": "Credentials & Access",
     "redemption": "Redemption",
     "topup": "Top Up",
     "user": "User",
@@ -14,6 +15,18 @@
     "login": "Login",
     "logout": "Logout",
     "register": "Register"
+  },
+  "proxy": {
+    "title": "Proxy",
+    "hint": "This page can only narrow your usable scope: it lists the providers and models available in your own group, and never grants anything beyond it. The root account is not restricted.",
+    "enable": "Restrict my usable scope",
+    "no_options": "No provider is available in your group yet, please contact the administrator.",
+    "select_all": "Select all models",
+    "all_models": "All models",
+    "all_models_tip": "No specific model is checked, which means every model of this provider is available.",
+    "none_selected": "Select at least one provider, or turn the restriction off.",
+    "save": "Save",
+    "saved": "Saved"
   },
   "topup": {
     "title": "Top Up Center",
@@ -126,7 +139,10 @@
         "models_required": "Please select at least one model!",
         "model_mapping_invalid": "Model mapping must be valid JSON format!",
         "update_success": "Channel updated successfully!",
-        "create_success": "Channel created successfully!"
+        "create_success": "Channel created successfully!",
+        "fetch_models_empty": "The provider returned no models",
+        "fetch_models_key_required": "Please fill in the key first",
+        "fetch_models_success": "Added {{count}} models"
       },
       "spark_version": "Model Version",
       "spark_version_placeholder": "Please enter Spark model version from API URL, e.g.: v2.1",
@@ -154,14 +170,47 @@
         "spark": "Enter in format: APPID|APISecret|APIKey",
         "fastgpt": "Enter in format: APIKey-AppId, e.g.: fastgpt-0sp2gtvfdgyi4k30jwlgwf1i-64f335d84283f05518e9e041",
         "tencent": "Enter in format: AppId|SecretId|SecretKey"
-      }
+      },
+      "section_provider": "Provider Configuration",
+      "section_models": "Model Configuration",
+      "section_other": "Others",
+      "headers": "Custom Request Headers",
+      "headers_prompt": "These headers are attached to every request this channel sends upstream. Host / Content-Length / Connection / Accept-Encoding cannot be overridden.",
+      "headers_unsupported": "Requests for this provider are sent via SDK or WebSocket, custom headers will not take effect.",
+      "opencode_session_hint": "OpenCode Go requires x-opencode-session on every request (otherwise the upstream returns 400 MissingSessionID). Add a header below: name x-opencode-session, value any stable string (e.g. your project name) — all conversations will share it.",
+      "headers_key_placeholder": "Header name, e.g. X-Title",
+      "headers_value_placeholder": "Value",
+      "add_header": "Add header",
+      "remove_header": "Remove",
+      "fetch_models": "Fetch models from provider",
+      "fetch_models_title": "Select models to add",
+      "fetch_models_search_placeholder": "Search models",
+      "fetch_models_select_all": "Select all",
+      "fetch_models_invert": "Invert",
+      "fetch_models_clear": "Clear",
+      "fetch_models_already_added": "already added",
+      "fetch_models_confirm": "Add selected models"
     }
   },
   "token": {
-    "title": "Token Management",
+    "title": "Credentials & Access",
+    "access_info": {
+      "page_title": "Credentials & Access",
+      "title": "Access information",
+      "token_hint": "Use a token from the table below as your API key; create one there if you have none.",
+      "base_url": "Base URL (OpenAI compatible)",
+      "models": "Model ids available to you",
+      "no_models": "No model available yet, please ask the administrator to configure channels.",
+      "example": "Example request",
+      "endpoints": "Supported endpoints",
+      "copy": "Copy",
+      "copy_all": "Copy all",
+      "copy_failed": "Copy failed, please select and copy manually"
+    },
     "search": "Search tokens by name ...",
     "table": {
       "name": "Name",
+      "key": "Token Value",
       "status": "Status",
       "used_quota": "Used Quota",
       "remain_quota": "Remaining Quota",
@@ -197,6 +246,8 @@
       "models_placeholder": "Please select allowed models, leave empty for no restrictions",
       "ip_limit": "IP Restriction",
       "ip_limit_placeholder": "Please enter allowed subnets, e.g.: 192.168.0.0/24, use commas to separate multiple subnets",
+      "status_enabled": "Enable this token",
+      "status_notice": "Once disabled the token stops working immediately. An expired or quota-exhausted token must have its expiry time or quota adjusted before it can be enabled again.",
       "expire_time": "Expiry Time",
       "expire_time_placeholder": "Please enter expiry time in yyyy-MM-dd HH:mm:ss format, -1 for no limit",
       "quota_notice": "Note: Token quota only limits the maximum usage of the token itself, actual usage is subject to account remaining quota.",

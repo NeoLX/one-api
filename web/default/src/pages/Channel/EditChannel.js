@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {useTranslation} from 'react-i18next';
-import {Button, Card, Form, Input, Message} from 'semantic-ui-react';
+import {Button, Card, Divider, Form, Input, Message, Modal} from 'semantic-ui-react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {API, copy, getChannelModels, showError, showInfo, showSuccess, verifyJSON,} from '../../helpers';
 import {CHANNEL_OPTIONS} from '../../constants';
@@ -57,6 +57,11 @@ const EditChannel = () => {
   const [basicModels, setBasicModels] = useState([]);
   const [fullModels, setFullModels] = useState([]);
   const [customModel, setCustomModel] = useState('');
+  const [headerRows, setHeaderRows] = useState([]);
+  const [fetchModelsLoading, setFetchModelsLoading] = useState(false);
+  const [fetchedModels, setFetchedModels] = useState(null);
+  const [fetchedModelSelection, setFetchedModelSelection] = useState([]);
+  const [fetchedModelKeyword, setFetchedModelKeyword] = useState('');
   const [config, setConfig] = useState({
     region: '',
     sk: '',
@@ -78,6 +83,110 @@ const EditChannel = () => {
 
   const handleConfigChange = (e, { name, value }) => {
     setConfig((inputs) => ({ ...inputs, [name]: value }));
+  };
+
+  const buildConfig = () => {
+    const cfg = { ...config };
+    const headers = {};
+    headerRows.forEach((row) => {
+      const key = row.key.trim();
+      if (key !== '') {
+        headers[key] = row.value;
+      }
+    });
+    if (Object.keys(headers).length > 0) {
+      cfg.headers = headers;
+    } else {
+      delete cfg.headers;
+    }
+    return JSON.stringify(cfg);
+  };
+
+  const addHeaderRow = () => {
+    setHeaderRows((rows) => [...rows, { key: '', value: '' }]);
+  };
+
+  const updateHeaderRow = (index, field, value) => {
+    setHeaderRows((rows) =>
+      rows.map((row, i) => (i === index ? { ...row, [field]: value } : row))
+    );
+  };
+
+  const removeHeaderRow = (index) => {
+    setHeaderRows((rows) => rows.filter((_, i) => i !== index));
+  };
+
+  // Ollama 不使用密钥
+  const keylessProvider = inputs.type === 30;
+
+  const fetchUpstreamModels = async () => {
+    if (inputs.key === '' && !keylessProvider && !isEdit) {
+      showInfo(t('channel.edit.messages.fetch_models_key_required'));
+      return;
+    }
+    setFetchModelsLoading(true);
+    try {
+      const res = await API.post('/api/channel/fetch_models', {
+        id: isEdit ? parseInt(channelId) : 0,
+        type: inputs.type,
+        base_url: inputs.base_url,
+        key: inputs.key,
+        config: buildConfig(),
+      });
+      const { success, message, data } = res.data;
+      if (!success) {
+        showError(message);
+        return;
+      }
+      const models = (data && data.models) || [];
+      if (models.length === 0) {
+        showInfo(t('channel.edit.messages.fetch_models_empty'));
+        return;
+      }
+      setFetchedModels(models);
+      setFetchedModelSelection(models.filter((m) => inputs.models.includes(m)));
+      setFetchedModelKeyword('');
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      setFetchModelsLoading(false);
+    }
+  };
+
+  const confirmFetchedModels = () => {
+    const merged = [...inputs.models];
+    let added = 0;
+    fetchedModelSelection.forEach((model) => {
+      if (!merged.includes(model)) {
+        merged.push(model);
+        added += 1;
+      }
+    });
+    handleInputChange(null, { name: 'models', value: merged });
+    setFetchedModels(null);
+    setFetchedModelSelection([]);
+    if (added > 0) {
+      showSuccess(t('channel.edit.messages.fetch_models_success', { count: added }));
+    }
+  };
+
+  const toggleFetchedModel = (model) => {
+    setFetchedModelSelection((selection) =>
+      selection.includes(model)
+        ? selection.filter((m) => m !== model)
+        : [...selection, model]
+    );
+  };
+
+  const invertVisibleFetchedModels = () => {
+    const visible = (fetchedModels || []).filter((m) =>
+      m.toLowerCase().includes(fetchedModelKeyword.trim().toLowerCase())
+    );
+    setFetchedModelSelection((selection) => {
+      const toRemove = visible.filter((m) => selection.includes(m));
+      const toAdd = visible.filter((m) => !selection.includes(m));
+      return [...selection.filter((m) => !toRemove.includes(m)), ...toAdd];
+    });
   };
 
   const loadChannel = async () => {
@@ -103,7 +212,13 @@ const EditChannel = () => {
       }
       setInputs(data);
       if (data.config !== '') {
-        setConfig(JSON.parse(data.config));
+        const cfg = JSON.parse(data.config);
+        const cfgHeaders = cfg.headers || {};
+        delete cfg.headers;
+        setConfig(cfg);
+        setHeaderRows(
+          Object.keys(cfgHeaders).map((key) => ({ key, value: cfgHeaders[key] }))
+        );
       }
       setBasicModels(getChannelModels(data.type));
     } else {
@@ -207,7 +322,7 @@ const EditChannel = () => {
     let res;
     localInputs.models = localInputs.models.join(',');
     localInputs.group = localInputs.groups.join(',');
-    localInputs.config = JSON.stringify(config);
+    localInputs.config = buildConfig();
     if (isEdit) {
       res = await API.put(`/api/channel/`, {
         ...localInputs,
@@ -257,6 +372,7 @@ const EditChannel = () => {
               : t('channel.edit.title_create')}
           </Card.Header>
           <Form loading={loading} autoComplete='new-password'>
+            <Divider horizontal>{t('channel.edit.section_provider')}</Divider>
             <Form.Field>
               <Form.Select
                 label={t('channel.edit.type')}
@@ -276,23 +392,6 @@ const EditChannel = () => {
                 onChange={handleInputChange}
                 value={inputs.name}
                 required
-              />
-            </Form.Field>
-            <Form.Field>
-              <Form.Dropdown
-                label={t('channel.edit.group')}
-                placeholder={t('channel.edit.group_placeholder')}
-                name='groups'
-                required
-                fluid
-                multiple
-                selection
-                allowAdditions
-                additionLabel={t('channel.edit.group_addition')}
-                onChange={handleInputChange}
-                value={inputs.groups}
-                autoComplete='new-password'
-                options={groupOptions}
               />
             </Form.Field>
             {renderChannelTip(inputs.type)}
@@ -414,113 +513,6 @@ const EditChannel = () => {
                 {t('channel.edit.douban_notice_2')}
               </Message>
             )}
-            {inputs.type !== 43 && (
-              <Form.Field>
-                <Form.Dropdown
-                  label={t('channel.edit.models')}
-                  placeholder={t('channel.edit.models_placeholder')}
-                  name='models'
-                  required
-                  fluid
-                  multiple
-                  search
-                  onLabelClick={(e, { value }) => {
-                    copy(value).then();
-                  }}
-                  selection
-                  onChange={handleInputChange}
-                  value={inputs.models}
-                  autoComplete='new-password'
-                  options={modelOptions}
-                />
-              </Form.Field>
-            )}
-            {inputs.type !== 43 && (
-              <div style={{ lineHeight: '40px', marginBottom: '12px' }}>
-                <Button
-                  type={'button'}
-                  onClick={() => {
-                    handleInputChange(null, {
-                      name: 'models',
-                      value: basicModels,
-                    });
-                  }}
-                >
-                  {t('channel.edit.buttons.fill_models')}
-                </Button>
-                <Button
-                  type={'button'}
-                  onClick={() => {
-                    handleInputChange(null, {
-                      name: 'models',
-                      value: fullModels,
-                    });
-                  }}
-                >
-                  {t('channel.edit.buttons.fill_all')}
-                </Button>
-                <Button
-                  type={'button'}
-                  onClick={() => {
-                    handleInputChange(null, { name: 'models', value: [] });
-                  }}
-                >
-                  {t('channel.edit.buttons.clear')}
-                </Button>
-                <Input
-                  action={
-                    <Button type={'button'} onClick={addCustomModel}>
-                      {t('channel.edit.buttons.add_custom')}
-                    </Button>
-                  }
-                  placeholder={t('channel.edit.buttons.custom_placeholder')}
-                  value={customModel}
-                  onChange={(e, { value }) => {
-                    setCustomModel(value);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      addCustomModel();
-                      e.preventDefault();
-                    }
-                  }}
-                />
-              </div>
-            )}
-            {inputs.type !== 43 && (
-              <>
-                <Form.Field>
-                  <Form.TextArea
-                    label={t('channel.edit.model_mapping')}
-                    placeholder={`${t(
-                      'channel.edit.model_mapping_placeholder'
-                    )}\n${JSON.stringify(MODEL_MAPPING_EXAMPLE, null, 2)}`}
-                    name='model_mapping'
-                    onChange={handleInputChange}
-                    value={inputs.model_mapping}
-                    style={{
-                      minHeight: 150,
-                      fontFamily: 'JetBrains Mono, Consolas',
-                    }}
-                    autoComplete='new-password'
-                  />
-                </Form.Field>
-                <Form.Field>
-                  <Form.TextArea
-                    label={t('channel.edit.system_prompt')}
-                    placeholder={t('channel.edit.system_prompt_placeholder')}
-                    name='system_prompt'
-                    onChange={handleInputChange}
-                    value={inputs.system_prompt}
-                    style={{
-                      minHeight: 150,
-                      fontFamily: 'JetBrains Mono, Consolas',
-                    }}
-                    autoComplete='new-password'
-                  />
-                </Form.Field>
-              </>
-            )}
             {inputs.type === 33 && (
               <Form.Field>
                 <Form.Input
@@ -640,6 +632,192 @@ const EditChannel = () => {
                 />
               </Form.Field>
             )}
+            {inputs.type === 33 || inputs.type === 18 || inputs.type === 46 ? (
+              <Message warning>{t('channel.edit.headers_unsupported')}</Message>
+            ) : (
+              <Form.Field>
+                <label>{t('channel.edit.headers')}</label>
+                <Message size='small'>{t('channel.edit.headers_prompt')}</Message>
+                {inputs.type === 52 && (
+                  <Message size='small' info>
+                    {t('channel.edit.opencode_session_hint')}
+                  </Message>
+                )}
+                {headerRows.map((row, index) => (
+                  <Form.Group key={index} widths='equal' style={{ marginBottom: '8px' }}>
+                    <Form.Input
+                      placeholder={t('channel.edit.headers_key_placeholder')}
+                      value={row.key}
+                      error={row.key.trim() === '' && row.value !== ''}
+                      onChange={(e, { value }) => updateHeaderRow(index, 'key', value)}
+                      autoComplete='new-password'
+                    />
+                    <Form.Input
+                      placeholder={t('channel.edit.headers_value_placeholder')}
+                      value={row.value}
+                      onChange={(e, { value }) => updateHeaderRow(index, 'value', value)}
+                      autoComplete='new-password'
+                    />
+                    <Button
+                      type='button'
+                      basic
+                      color='red'
+                      onClick={() => removeHeaderRow(index)}
+                    >
+                      {t('channel.edit.remove_header')}
+                    </Button>
+                  </Form.Group>
+                ))}
+                <Button type='button' onClick={addHeaderRow}>
+                  {t('channel.edit.add_header')}
+                </Button>
+              </Form.Field>
+            )}
+            {inputs.type !== 43 && (
+              <Divider horizontal>{t('channel.edit.section_models')}</Divider>
+            )}
+            {inputs.type !== 43 && (
+              <Form.Field>
+                <Button
+                  type='button'
+                  loading={fetchModelsLoading}
+                  disabled={
+                    fetchModelsLoading ||
+                    batch ||
+                    (inputs.key === '' && !isEdit && !keylessProvider)
+                  }
+                  onClick={fetchUpstreamModels}
+                >
+                  {t('channel.edit.fetch_models')}
+                </Button>
+              </Form.Field>
+            )}
+            {inputs.type !== 43 && (
+              <Form.Field>
+                <Form.Dropdown
+                  label={t('channel.edit.models')}
+                  placeholder={t('channel.edit.models_placeholder')}
+                  name='models'
+                  required
+                  fluid
+                  multiple
+                  search
+                  onLabelClick={(e, { value }) => {
+                    copy(value).then();
+                  }}
+                  selection
+                  onChange={handleInputChange}
+                  value={inputs.models}
+                  autoComplete='new-password'
+                  options={modelOptions}
+                />
+              </Form.Field>
+            )}
+            {inputs.type !== 43 && (
+              <div style={{ lineHeight: '40px', marginBottom: '12px' }}>
+                <Button
+                  type={'button'}
+                  disabled={basicModels.length === 0}
+                  onClick={() => {
+                    handleInputChange(null, {
+                      name: 'models',
+                      value: basicModels,
+                    });
+                  }}
+                >
+                  {t('channel.edit.buttons.fill_models')}
+                </Button>
+                <Button
+                  type={'button'}
+                  onClick={() => {
+                    handleInputChange(null, {
+                      name: 'models',
+                      value: fullModels,
+                    });
+                  }}
+                >
+                  {t('channel.edit.buttons.fill_all')}
+                </Button>
+                <Button
+                  type={'button'}
+                  onClick={() => {
+                    handleInputChange(null, { name: 'models', value: [] });
+                  }}
+                >
+                  {t('channel.edit.buttons.clear')}
+                </Button>
+                <Input
+                  action={
+                    <Button type={'button'} onClick={addCustomModel}>
+                      {t('channel.edit.buttons.add_custom')}
+                    </Button>
+                  }
+                  placeholder={t('channel.edit.buttons.custom_placeholder')}
+                  value={customModel}
+                  onChange={(e, { value }) => {
+                    setCustomModel(value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      addCustomModel();
+                      e.preventDefault();
+                    }
+                  }}
+                />
+              </div>
+            )}
+            {inputs.type !== 43 && (
+              <>
+                <Form.Field>
+                  <Form.TextArea
+                    label={t('channel.edit.model_mapping')}
+                    placeholder={`${t(
+                      'channel.edit.model_mapping_placeholder'
+                    )}\n${JSON.stringify(MODEL_MAPPING_EXAMPLE, null, 2)}`}
+                    name='model_mapping'
+                    onChange={handleInputChange}
+                    value={inputs.model_mapping}
+                    style={{
+                      minHeight: 150,
+                      fontFamily: 'JetBrains Mono, Consolas',
+                    }}
+                    autoComplete='new-password'
+                  />
+                </Form.Field>
+                <Form.Field>
+                  <Form.TextArea
+                    label={t('channel.edit.system_prompt')}
+                    placeholder={t('channel.edit.system_prompt_placeholder')}
+                    name='system_prompt'
+                    onChange={handleInputChange}
+                    value={inputs.system_prompt}
+                    style={{
+                      minHeight: 150,
+                      fontFamily: 'JetBrains Mono, Consolas',
+                    }}
+                    autoComplete='new-password'
+                  />
+                </Form.Field>
+              </>
+            )}
+            <Divider horizontal>{t('channel.edit.section_other')}</Divider>
+            <Form.Field>
+              <Form.Dropdown
+                label={t('channel.edit.group')}
+                placeholder={t('channel.edit.group_placeholder')}
+                name='groups'
+                required
+                fluid
+                multiple
+                selection
+                allowAdditions
+                additionLabel={t('channel.edit.group_addition')}
+                onChange={handleInputChange}
+                value={inputs.groups}
+                autoComplete='new-password'
+                options={groupOptions}
+              />
+            </Form.Field>
             {inputs.type !== 33 && !isEdit && (
               <Form.Checkbox
                 checked={batch}
@@ -678,7 +856,7 @@ const EditChannel = () => {
                 />
               </Form.Field>
             )}
-            <Button onClick={handleCancel}>
+            <Button type='button' onClick={handleCancel}>
               {t('channel.edit.buttons.cancel')}
             </Button>
             <Button
@@ -689,6 +867,68 @@ const EditChannel = () => {
               {t('channel.edit.buttons.submit')}
             </Button>
           </Form>
+          <Modal
+            open={fetchedModels !== null}
+            onClose={() => setFetchedModels(null)}
+            size='small'
+          >
+            <Modal.Header>{t('channel.edit.fetch_models_title')}</Modal.Header>
+            <Modal.Content scrolling>
+              <div style={{ marginBottom: '12px' }}>
+                <Button
+                  type='button'
+                  onClick={() => setFetchedModelSelection(fetchedModels || [])}
+                >
+                  {t('channel.edit.fetch_models_select_all')}
+                </Button>
+                <Button
+                  type='button'
+                  onClick={invertVisibleFetchedModels}
+                >
+                  {t('channel.edit.fetch_models_invert')}
+                </Button>
+                <Button type='button' onClick={() => setFetchedModelSelection([])}>
+                  {t('channel.edit.fetch_models_clear')}
+                </Button>
+                <span style={{ marginLeft: '12px' }}>
+                  {fetchedModelSelection.length} / {(fetchedModels || []).length}
+                </span>
+              </div>
+              <Form>
+                <Form.Input
+                  icon='search'
+                  placeholder={t('channel.edit.fetch_models_search_placeholder')}
+                  value={fetchedModelKeyword}
+                  onChange={(e, { value }) => setFetchedModelKeyword(value)}
+                  autoComplete='new-password'
+                />
+                {(fetchedModels || [])
+                  .filter((model) =>
+                    model.toLowerCase().includes(fetchedModelKeyword.trim().toLowerCase())
+                  )
+                  .map((model) => (
+                    <Form.Checkbox
+                      key={model}
+                      label={
+                        inputs.models.includes(model)
+                          ? `${model} · ${t('channel.edit.fetch_models_already_added')}`
+                          : model
+                      }
+                      checked={fetchedModelSelection.includes(model)}
+                      onChange={() => toggleFetchedModel(model)}
+                    />
+                  ))}
+              </Form>
+            </Modal.Content>
+            <Modal.Actions>
+              <Button type='button' onClick={() => setFetchedModels(null)}>
+                {t('channel.edit.buttons.cancel')}
+              </Button>
+              <Button type='button' positive onClick={confirmFetchedModels}>
+                {t('channel.edit.fetch_models_confirm')}
+              </Button>
+            </Modal.Actions>
+          </Modal>
         </Card.Content>
       </Card>
     </div>

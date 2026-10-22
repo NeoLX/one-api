@@ -13,3 +13,5 @@ cmd.md
 /one-api
 temp
 .DS_Store
+# 本地开发笔记：含机器路径、本机端口与临时实例的会话密钥，不入库
+docs/superpowers/

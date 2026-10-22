@@ -19,7 +19,11 @@ type Ability struct {
 	Priority  *int64 `json:"priority" gorm:"bigint;default:0;index"`
 }
 
-func GetRandomSatisfiedChannel(group string, model string, ignoreFirstPriority bool) (*Channel, error) {
+// GetRandomSatisfiedChannel 按 分组+模型 随机（按优先级）挑一个渠道。
+// allowedTypes 非 nil 时只在这些渠道类型里挑（用户级「代理」白名单的供应商过滤，
+// 空集合表示"没有任何供应商被允许"，即选不到渠道）；为 nil 表示不限制，
+// 此时不加 JOIN、行为与加这个参数之前完全一致。
+func GetRandomSatisfiedChannel(group string, model string, ignoreFirstPriority bool, allowedTypes map[int]bool) (*Channel, error) {
 	ability := Ability{}
 	groupCol := "`group`"
 	trueVal := "1"
@@ -27,14 +31,29 @@ func GetRandomSatisfiedChannel(group string, model string, ignoreFirstPriority b
 		groupCol = `"group"`
 		trueVal = "true"
 	}
+	// JOIN 后 channels 也有 group 列，外层条件必须带表名限定，否则 ambiguous column name
+	colPrefix := ""
+	if allowedTypes != nil {
+		colPrefix = "abilities."
+		groupCol = colPrefix + groupCol
+	}
 
 	var err error = nil
 	var channelQuery *gorm.DB
 	if ignoreFirstPriority {
-		channelQuery = DB.Where(groupCol+" = ? and model = ? and enabled = "+trueVal, group, model)
+		channelQuery = DB.Where(groupCol+" = ? and "+colPrefix+"model = ? and "+colPrefix+"enabled = "+trueVal, group, model)
 	} else {
-		maxPrioritySubQuery := DB.Model(&Ability{}).Select("MAX(priority)").Where(groupCol+" = ? and model = ? and enabled = "+trueVal, group, model)
-		channelQuery = DB.Where(groupCol+" = ? and model = ? and enabled = "+trueVal+" and priority = (?)", group, model, maxPrioritySubQuery)
+		maxPrioritySubQuery := DB.Model(&Ability{}).Select("MAX(priority)").Where(groupCol+" = ? and "+colPrefix+"model = ? and "+colPrefix+"enabled = "+trueVal, group, model)
+		channelQuery = DB.Where(groupCol+" = ? and "+colPrefix+"model = ? and "+colPrefix+"enabled = "+trueVal+" and "+colPrefix+"priority = (?)", group, model, maxPrioritySubQuery)
+	}
+	if allowedTypes != nil {
+		types := make([]int, 0, len(allowedTypes))
+		for channelType := range allowedTypes {
+			types = append(types, channelType)
+		}
+		channelQuery = channelQuery.
+			Joins("JOIN channels ON channels.id = abilities.channel_id").
+			Where("channels.type IN ?", types)
 	}
 	if common.UsingSQLite || common.UsingPostgreSQL {
 		err = channelQuery.Order("RANDOM()").First(&ability).Error
