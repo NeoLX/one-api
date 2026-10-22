@@ -67,8 +67,17 @@ func Relay(c *gin.Context) {
 		logger.Errorf(ctx, "relay error happen, status code is %d, won't retry in this case", bizErr.StatusCode)
 		retryTimes = 0
 	}
+	// 重试换渠道时也要守住用户级「代理」白名单，否则重试会绕过供应商限制
+	proxyRules, proxyErr := dbmodel.CacheGetUserProxyRules(userId)
+	if proxyErr != nil {
+		logger.Errorf(ctx, "CacheGetUserProxyRules failed: %+v", proxyErr)
+	}
+	allowedTypes := dbmodel.AllowedChannelTypesForModel(proxyRules, originalModel)
 	for i := retryTimes; i > 0; i-- {
-		channel, err := dbmodel.CacheGetRandomSatisfiedChannel(group, originalModel, i != retryTimes)
+		if proxyErr != nil {
+			break
+		}
+		channel, err := dbmodel.CacheGetRandomSatisfiedChannel(group, originalModel, i != retryTimes, allowedTypes)
 		if err != nil {
 			logger.Errorf(ctx, "CacheGetRandomSatisfiedChannel failed: %+v", err)
 			break

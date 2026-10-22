@@ -30,6 +30,11 @@ let headerButtons = [
     admin: true,
   },
   {
+    name: 'header.proxy',
+    to: '/proxy',
+    icon: 'shield alternate',
+  },
+  {
     name: 'header.token',
     to: '/token',
     icon: 'key',

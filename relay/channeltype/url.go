@@ -54,6 +54,9 @@ var ChannelBaseURLs = []string{
 	"",                                          // 50
 
 	"https://generativelanguage.googleapis.com/v1beta/openai/", // 51
+	// OpenCode Go（订阅套餐）的 OpenAI 兼容端点：聊天为 {base}/v1/chat/completions；
+	// 模型列表不在此前缀下，见 controller/channel-models.go 的 OpenCodeGo 分支
+	"https://opencode.ai/inference/go/openai", // 52
 }
 
 func init() {

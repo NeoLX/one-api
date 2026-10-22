@@ -23,6 +23,7 @@ var (
 	UserId2QuotaCacheSeconds  = config.SyncFrequency
 	UserId2StatusCacheSeconds = config.SyncFrequency
 	GroupModelsCacheSeconds   = config.SyncFrequency
+	UserId2ProxyCacheSeconds  = config.SyncFrequency
 )
 
 func CacheGetTokenByKey(key string) (*Token, error) {
@@ -71,6 +72,26 @@ func CacheGetUserGroup(id int) (group string, err error) {
 		}
 	}
 	return group, err
+}
+
+// CacheGetUserProxyConfig 取用户自助配置的代理白名单原始 JSON。
+// Redis 启用时缓存（更新配置时要删 key），否则直读数据库。
+func CacheGetUserProxyConfig(id int) (raw string, err error) {
+	if !common.RedisEnabled {
+		return GetUserProxyConfig(id)
+	}
+	raw, err = common.RedisGet(fmt.Sprintf("user_proxy_config:%d", id))
+	if err != nil {
+		raw, err = GetUserProxyConfig(id)
+		if err != nil {
+			return "", err
+		}
+		err = common.RedisSet(fmt.Sprintf("user_proxy_config:%d", id), raw, time.Duration(UserId2ProxyCacheSeconds)*time.Second)
+		if err != nil {
+			logger.SysError("Redis set user proxy config error: " + err.Error())
+		}
+	}
+	return raw, err
 }
 
 func fetchAndUpdateUserQuota(ctx context.Context, id int) (quota int64, err error) {
@@ -224,13 +245,28 @@ func SyncChannelCache(frequency int) {
 	}
 }
 
-func CacheGetRandomSatisfiedChannel(group string, model string, ignoreFirstPriority bool) (*Channel, error) {
+// CacheGetRandomSatisfiedChannel 见 GetRandomSatisfiedChannel 的 allowedTypes 说明。
+func CacheGetRandomSatisfiedChannel(group string, model string, ignoreFirstPriority bool, allowedTypes map[int]bool) (*Channel, error) {
 	if !config.MemoryCacheEnabled {
-		return GetRandomSatisfiedChannel(group, model, ignoreFirstPriority)
+		return GetRandomSatisfiedChannel(group, model, ignoreFirstPriority, allowedTypes)
 	}
 	channelSyncLock.RLock()
 	defer channelSyncLock.RUnlock()
 	channels := group2model2channels[group][model]
+	if allowedTypes != nil {
+		filtered := make([]*Channel, 0, len(channels))
+		for _, channel := range channels {
+			if allowedTypes[channel.Type] {
+				filtered = append(filtered, channel)
+			}
+		}
+		channels = filtered
+	}
+	return pickChannelByPriority(channels, ignoreFirstPriority)
+}
+
+// pickChannelByPriority 是两条选渠道路径共用的"按优先级 + 随机"逻辑。
+func pickChannelByPriority(channels []*Channel, ignoreFirstPriority bool) (*Channel, error) {
 	if len(channels) == 0 {
 		return nil, errors.New("channel not found")
 	}

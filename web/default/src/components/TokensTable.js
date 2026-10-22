@@ -26,6 +26,14 @@ function renderTimestamp(timestamp) {
   return <>{timestamp2string(timestamp)}</>;
 }
 
+function maskTokenKey(key) {
+  const full = `sk-${key || ''}`;
+  if (full.length <= 12) {
+    return full;
+  }
+  return `${full.slice(0, 5)}${'•'.repeat(8)}${full.slice(-4)}`;
+}
+
 function renderStatus(status, t) {
   switch (status) {
     case 1:
@@ -63,21 +71,6 @@ function renderStatus(status, t) {
 
 const TokensTable = () => {
   const { t } = useTranslation();
-
-  const COPY_OPTIONS = [
-    { key: 'raw', text: t('token.copy_options.raw'), value: '' },
-    { key: 'next', text: t('token.copy_options.next'), value: 'next' },
-    { key: 'ama', text: t('token.copy_options.ama'), value: 'ama' },
-    { key: 'opencat', text: t('token.copy_options.opencat'), value: 'opencat' },
-    { key: 'lobe', text: t('token.copy_options.lobe'), value: 'lobechat' },
-  ];
-
-  const OPEN_LINK_OPTIONS = [
-    { key: 'next', text: t('token.copy_options.next'), value: 'next' },
-    { key: 'ama', text: t('token.copy_options.ama'), value: 'ama' },
-    { key: 'opencat', text: t('token.copy_options.opencat'), value: 'opencat' },
-    { key: 'lobe', text: t('token.copy_options.lobe'), value: 'lobechat' },
-  ];
 
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -120,95 +113,13 @@ const TokensTable = () => {
     await loadTokens(activePage - 1);
   };
 
-  const onCopy = async (type, key) => {
-    let status = localStorage.getItem('status');
-    let serverAddress = '';
-    if (status) {
-      status = JSON.parse(status);
-      serverAddress = status.server_address;
-    }
-    if (serverAddress === '') {
-      serverAddress = window.location.origin;
-    }
-    let encodedServerAddress = encodeURIComponent(serverAddress);
-    const nextLink = localStorage.getItem('chat_link');
-    let nextUrl;
-
-    if (nextLink) {
-      nextUrl =
-        nextLink + `/#/?settings={"key":"sk-${key}","url":"${serverAddress}"}`;
-    } else {
-      nextUrl = `https://app.nextchat.dev/#/?settings={"key":"sk-${key}","url":"${serverAddress}"}`;
-    }
-
-    let url;
-    switch (type) {
-      case 'ama':
-        url = `ama://set-api-key?server=${encodedServerAddress}&key=sk-${key}`;
-        break;
-      case 'opencat':
-        url = `opencat://team/join?domain=${encodedServerAddress}&token=sk-${key}`;
-        break;
-      case 'next':
-        url = nextUrl;
-        break;
-      case 'lobechat':
-        url =
-          nextLink +
-          `/?settings={"keyVaults":{"openai":{"apiKey":"sk-${key}","baseURL":"${serverAddress}/v1"}}}`;
-        break;
-      default:
-        url = `sk-${key}`;
-    }
+  const onCopy = async (key) => {
+    const url = `sk-${key}`;
     if (await copy(url)) {
       showSuccess(t('token.messages.copy_success'));
     } else {
       showWarning(t('token.messages.copy_failed'));
-      setSearchKeyword(url);
     }
-  };
-
-  const onOpenLink = async (type, key) => {
-    let status = localStorage.getItem('status');
-    let serverAddress = '';
-    if (status) {
-      status = JSON.parse(status);
-      serverAddress = status.server_address;
-    }
-    if (serverAddress === '') {
-      serverAddress = window.location.origin;
-    }
-    let encodedServerAddress = encodeURIComponent(serverAddress);
-    const chatLink = localStorage.getItem('chat_link');
-    let defaultUrl;
-
-    if (chatLink) {
-      defaultUrl =
-        chatLink + `/#/?settings={"key":"sk-${key}","url":"${serverAddress}"}`;
-    } else {
-      defaultUrl = `https://app.nextchat.dev/#/?settings={"key":"sk-${key}","url":"${serverAddress}"}`;
-    }
-    let url;
-    switch (type) {
-      case 'ama':
-        url = `ama://set-api-key?server=${encodedServerAddress}&key=sk-${key}`;
-        break;
-
-      case 'opencat':
-        url = `opencat://team/join?domain=${encodedServerAddress}&token=sk-${key}`;
-        break;
-
-      case 'lobechat':
-        url =
-          chatLink +
-          `/?settings={"keyVaults":{"openai":{"apiKey":"sk-${key}","baseURL":"${serverAddress}/v1"}}}`;
-        break;
-
-      default:
-        url = defaultUrl;
-    }
-
-    window.open(url, '_blank');
   };
 
   useEffect(() => {
@@ -326,6 +237,7 @@ const TokensTable = () => {
             >
               {t('token.table.name')}
             </Table.HeaderCell>
+            <Table.HeaderCell>{t('token.table.key')}</Table.HeaderCell>
             <Table.HeaderCell
               style={{ cursor: 'pointer' }}
               onClick={() => {
@@ -379,26 +291,28 @@ const TokensTable = () => {
             .map((token, idx) => {
               if (token.deleted) return <></>;
 
-              const copyOptionsWithHandlers = COPY_OPTIONS.map((option) => ({
-                ...option,
-                onClick: async () => {
-                  await onCopy(option.value, token.key);
-                },
-              }));
-
-              const openLinkOptionsWithHandlers = OPEN_LINK_OPTIONS.map(
-                (option) => ({
-                  ...option,
-                  onClick: async () => {
-                    await onOpenLink(option.value, token.key);
-                  },
-                })
-              );
-
               return (
                 <Table.Row key={token.id}>
                   <Table.Cell>
                     {token.name ? token.name : t('token.table.no_name')}
+                  </Table.Cell>
+                  <Table.Cell>
+                    <span
+                      style={{
+                        fontFamily: 'monospace',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {maskTokenKey(token.key)}
+                    </span>
+                    <Button
+                      size='mini'
+                      basic
+                      icon='copy'
+                      title={t('token.buttons.copy')}
+                      style={{ marginLeft: '0.5em' }}
+                      onClick={async () => await onCopy(token.key)}
+                    />
                   </Table.Cell>
                   <Table.Cell>{renderStatus(token.status, t)}</Table.Cell>
                   <Table.Cell>{renderQuota(token.used_quota, t)}</Table.Cell>
@@ -414,79 +328,36 @@ const TokensTable = () => {
                       : renderTimestamp(token.expired_time)}
                   </Table.Cell>
                   <Table.Cell>
-                    <div>
-                      <Button.Group color='green' size={'tiny'}>
+                    <Button
+                      size='mini'
+                      icon='edit'
+                      as={Link}
+                      to={'/token/edit/' + token.id}
+                      title={t('token.buttons.edit')}
+                    />
+                    <Popup
+                      trigger={
                         <Button
-                          size={'tiny'}
-                          positive
-                          onClick={async () => await onCopy('', token.key)}
-                        >
-                          {t('token.buttons.copy')}
-                        </Button>
-                        <Dropdown
-                          className='button icon'
-                          floating
-                          options={copyOptionsWithHandlers}
-                          trigger={<></>}
-                        />
-                      </Button.Group>{' '}
-                      <Button.Group color='olive' size={'tiny'}>
-                        <Button
-                          size={'tiny'}
-                          positive
-                          onClick={() => onOpenLink('', token.key)}
-                        >
-                          {t('token.buttons.chat')}
-                        </Button>
-                        <Dropdown
-                          className='button icon'
-                          floating
-                          options={openLinkOptionsWithHandlers}
-                          trigger={<></>}
-                        />
-                      </Button.Group>{' '}
-                      <Popup
-                        trigger={
-                          <Button size='mini' negative>
-                            {t('token.buttons.delete')}
-                          </Button>
-                        }
-                        on='click'
-                        flowing
-                        hoverable
-                      >
-                        <Button
-                          size={'tiny'}
+                          size='mini'
+                          icon='trash alternate'
                           negative
-                          onClick={() => {
-                            manageToken(token.id, 'delete', idx);
-                          }}
-                        >
-                          {t('token.buttons.confirm_delete')} {token.name}
-                        </Button>
-                      </Popup>
+                          title={t('token.buttons.delete')}
+                        />
+                      }
+                      on='click'
+                      flowing
+                      hoverable
+                    >
                       <Button
                         size={'tiny'}
+                        negative
                         onClick={() => {
-                          manageToken(
-                            token.id,
-                            token.status === 1 ? 'disable' : 'enable',
-                            idx
-                          );
+                          manageToken(token.id, 'delete', idx);
                         }}
                       >
-                        {token.status === 1
-                          ? t('token.buttons.disable')
-                          : t('token.buttons.enable')}
+                        {t('token.buttons.confirm_delete')} {token.name}
                       </Button>
-                      <Button
-                        size={'tiny'}
-                        as={Link}
-                        to={'/token/edit/' + token.id}
-                      >
-                        {t('token.buttons.edit')}
-                      </Button>
-                    </div>
+                    </Popup>
                   </Table.Cell>
                 </Table.Row>
               );
@@ -495,7 +366,7 @@ const TokensTable = () => {
 
         <Table.Footer>
           <Table.Row>
-            <Table.HeaderCell colSpan='7'>
+            <Table.HeaderCell colSpan='8'>
               <Button size='small' as={Link} to='/token/add' loading={loading}>
                 {t('token.buttons.add')}
               </Button>

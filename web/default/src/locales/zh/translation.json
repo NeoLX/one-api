@@ -1,8 +1,9 @@
 {
   "header": {
     "home": "首页",
-    "channel": "渠道",
-    "token": "令牌",
+    "channel": "供应商和模型",
+    "proxy": "代理",
+    "token": "凭证与接入",
     "redemption": "兑换",
     "topup": "充值",
     "user": "用户",
@@ -14,6 +15,18 @@
     "login": "登录",
     "logout": "注销",
     "register": "注册"
+  },
+  "proxy": {
+    "title": "代理",
+    "hint": "这里只能收窄你的可用范围：可选清单只包含你所在分组内的供应商与模型，不会给你分组之外的能力。root 账号不受此限制。",
+    "enable": "限制我的可用范围",
+    "no_options": "你所在分组下暂时没有可用的供应商，请联系管理员。",
+    "select_all": "全选模型",
+    "all_models": "全部模型",
+    "all_models_tip": "当前未勾选具体模型，表示该供应商的全部模型都可用。",
+    "none_selected": "请至少勾选一个供应商，或关闭限制。",
+    "save": "保存",
+    "saved": "保存成功"
   },
   "topup": {
     "title": "充值中心",
@@ -126,7 +139,10 @@
         "models_required": "请至少选择一个模型！",
         "model_mapping_invalid": "模型映射必须是合法的 JSON 格式！",
         "update_success": "渠道更新成功！",
-        "create_success": "渠道创建成功！"
+        "create_success": "渠道创建成功！",
+        "fetch_models_empty": "上游未返回模型",
+        "fetch_models_key_required": "请先填写密钥",
+        "fetch_models_success": "已添加 {{count}} 个模型"
       },
       "spark_version": "模型版本",
       "spark_version_placeholder": "请输入星火大模型版本，注意是接口地址中的版本号，例如：v2.1",
@@ -154,14 +170,47 @@
         "spark": "按照如下格式输入：APPID|APISecret|APIKey",
         "fastgpt": "按照如下格式输入：APIKey-AppId，例如：fastgpt-0sp2gtvfdgyi4k30jwlgwf1i-64f335d84283f05518e9e041",
         "tencent": "按照如下格式输入：AppId|SecretId|SecretKey"
-      }
+      },
+      "section_provider": "供应商配置",
+      "section_models": "模型配置",
+      "section_other": "其他",
+      "headers": "自定义请求头",
+      "headers_prompt": "这些请求头会附加到本渠道发往上游的每个请求上，可用于自定义认证、附加标记等。Host / Content-Length / Connection / Accept-Encoding 不允许自定义。",
+      "headers_unsupported": "该供应商的请求由 SDK 或 WebSocket 发出，自定义请求头不会生效。",
+      "opencode_session_hint": "OpenCode Go 要求每个请求带上 x-opencode-session（缺了上游直接返回 400 MissingSessionID）。请在下面加一条请求头：名称填 x-opencode-session，值填任意稳定字符串（例如项目名）——所有会话会共用一个值。",
+      "headers_key_placeholder": "请求头名称，例如 X-Title",
+      "headers_value_placeholder": "值",
+      "add_header": "添加请求头",
+      "remove_header": "删除",
+      "fetch_models": "从上游拉取模型",
+      "fetch_models_title": "选择要添加的模型",
+      "fetch_models_search_placeholder": "搜索模型",
+      "fetch_models_select_all": "全选",
+      "fetch_models_invert": "反选",
+      "fetch_models_clear": "清空",
+      "fetch_models_already_added": "已添加",
+      "fetch_models_confirm": "添加选中模型"
     }
   },
   "token": {
-    "title": "令牌管理",
+    "title": "凭证与接入",
+    "access_info": {
+      "page_title": "凭证与接入",
+      "title": "接入信息",
+      "token_hint": "用下面表格里的令牌作为 API Key；没有令牌就在表格里新建一个。",
+      "base_url": "接入地址（OpenAI 兼容）",
+      "models": "你可用的模型 id",
+      "no_models": "当前没有可用模型，请先让管理员配置渠道。",
+      "example": "调用示例",
+      "endpoints": "支持的端点",
+      "copy": "复制",
+      "copy_all": "复制全部",
+      "copy_failed": "复制失败，请手动选择复制"
+    },
     "search": "搜索令牌的名称 ...",
     "table": {
       "name": "名称",
+      "key": "令牌值",
       "status": "状态",
       "used_quota": "已用额度",
       "remain_quota": "剩余额度",
@@ -197,6 +246,8 @@
       "models_placeholder": "请选择允许使用的模型，留空则不进行限制",
       "ip_limit": "IP 限制",
       "ip_limit_placeholder": "请输入允许访问的网段，例如：192.168.0.0/24，请使用英文逗号分隔多个网段",
+      "status_enabled": "启用此令牌",
+      "status_notice": "关闭后该令牌立即无法调用。已过期或额度已用尽的令牌，需先调整过期时间或额度才能重新启用。",
       "expire_time": "过期时间",
       "expire_time_placeholder": "请输入过期时间，格式为 yyyy-MM-dd HH:mm:ss，-1 表示无限制",
       "quota_notice": "注意，令牌的额度仅用于限制令牌本身的最大额度使用量，实际的使用受到账户的剩余额度限制。",

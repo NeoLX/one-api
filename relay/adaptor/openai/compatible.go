@@ -85,6 +85,11 @@ func GetCompatibleChannelMeta(channelType int) (string, []string) {
 		return "alibailian", alibailian.ModelList
 	case channeltype.GeminiOpenAICompatible:
 		return "geminiv2", geminiv2.ModelList
+	case channeltype.OpenCodeGo:
+		// 模型清单刻意留空：该套餐模型变动频繁，用渠道页的「从上游拉取模型」取实况，
+		// 免得在下面挂一份会过期的静态清单；返回非空会让 /v1/models 与前端下拉显示错的东西。
+		// 必须是空切片而非 nil：nil 会被序列化成 JSON null，前端拿它当下拉 options 会崩
+		return "opencode-go", []string{}
 	default:
 		return "openai", ModelList
 	}

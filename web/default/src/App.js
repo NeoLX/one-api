@@ -17,6 +17,7 @@ import { UserContext } from './context/User';
 import { StatusContext } from './context/Status';
 import Channel from './pages/Channel';
 import Token from './pages/Token';
+import Proxy from './pages/Proxy';
 import EditToken from './pages/Token/EditToken';
 import EditChannel from './pages/Channel/EditChannel';
 import Redemption from './pages/Redemption';
@@ -124,6 +125,14 @@ function App() {
           <Suspense fallback={<Loading></Loading>}>
             <EditChannel />
           </Suspense>
+        }
+      />
+      <Route
+        path='/proxy'
+        element={
+          <PrivateRoute>
+            <Proxy />
+          </PrivateRoute>
         }
       />
       <Route

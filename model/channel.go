@@ -41,27 +41,31 @@ type Channel struct {
 }
 
 type ChannelConfig struct {
-	Region            string `json:"region,omitempty"`
-	SK                string `json:"sk,omitempty"`
-	AK                string `json:"ak,omitempty"`
-	UserID            string `json:"user_id,omitempty"`
-	APIVersion        string `json:"api_version,omitempty"`
-	LibraryID         string `json:"library_id,omitempty"`
-	Plugin            string `json:"plugin,omitempty"`
-	VertexAIProjectID string `json:"vertex_ai_project_id,omitempty"`
-	VertexAIADC       string `json:"vertex_ai_adc,omitempty"`
+	Region            string            `json:"region,omitempty"`
+	SK                string            `json:"sk,omitempty"`
+	AK                string            `json:"ak,omitempty"`
+	UserID            string            `json:"user_id,omitempty"`
+	APIVersion        string            `json:"api_version,omitempty"`
+	LibraryID         string            `json:"library_id,omitempty"`
+	Plugin            string            `json:"plugin,omitempty"`
+	VertexAIProjectID string            `json:"vertex_ai_project_id,omitempty"`
+	VertexAIADC       string            `json:"vertex_ai_adc,omitempty"`
+	Headers           map[string]string `json:"headers,omitempty"`
 }
 
 func GetAllChannels(startIdx int, num int, scope string) ([]*Channel, error) {
 	var channels []*Channel
 	var err error
+	// 注意：default（列表接口）刻意不带 key 和 config，避免泄露密钥。
+	// all / disabled 服务于服务端批处理（批量测渠道、批量更新余额），依赖完整的 key 与 config，
+	// 不能一起 Omit，否则 Azure/Gemini 这类靠 config 取 api_version 的渠道会失效。
 	switch scope {
 	case "all":
 		err = DB.Order("id desc").Find(&channels).Error
 	case "disabled":
 		err = DB.Order("id desc").Where("status = ? or status = ?", ChannelStatusAutoDisabled, ChannelStatusManuallyDisabled).Find(&channels).Error
 	default:
-		err = DB.Order("id desc").Limit(num).Offset(startIdx).Omit("key").Find(&channels).Error
+		err = DB.Order("id desc").Limit(num).Offset(startIdx).Omit("key", "config").Find(&channels).Error
 	}
 	return channels, err
 }

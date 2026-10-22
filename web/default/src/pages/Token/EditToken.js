@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  Checkbox,
   Form,
   Header,
   Message,
@@ -32,8 +33,10 @@ const EditToken = () => {
     unlimited_quota: false,
     models: [],
     subnet: '',
+    status: 1,
   };
   const [inputs, setInputs] = useState(originInputs);
+  const [originStatus, setOriginStatus] = useState(1);
   const { name, remain_quota, expired_time, unlimited_quota } = inputs;
   const navigate = useNavigate();
   const handleInputChange = (e, { name, value }) => {
@@ -75,6 +78,7 @@ const EditToken = () => {
           data.models = data.models.split(',');
         }
         setInputs(data);
+        setOriginStatus(data.status);
       } else {
         showError(message || 'Failed to load token');
       }
@@ -130,23 +134,36 @@ const EditToken = () => {
       localInputs.expired_time = Math.ceil(time / 1000);
     }
     localInputs.models = localInputs.models.join(',');
-    let res;
     if (isEdit) {
-      res = await API.put(`/api/token/`, {
+      const newStatus = localInputs.status;
+      const res = await API.put(`/api/token/`, {
         ...localInputs,
         id: parseInt(tokenId),
       });
-    } else {
-      res = await API.post(`/api/token/`, localInputs);
+      if (!res.data.success) {
+        showError(res.data.message);
+        return;
+      }
+      // 状态单独走 status_only 接口：普通更新不会覆盖 status
+      if (newStatus !== originStatus) {
+        const statusRes = await API.put('/api/token/?status_only=true', {
+          id: parseInt(tokenId),
+          status: newStatus,
+        });
+        if (!statusRes.data.success) {
+          showError(statusRes.data.message);
+          return;
+        }
+        setOriginStatus(newStatus);
+      }
+      showSuccess(t('token.edit.messages.update_success'));
+      return;
     }
+    const res = await API.post('/api/token/', localInputs);
     const { success, message } = res.data;
     if (success) {
-      if (isEdit) {
-        showSuccess(t('token.edit.messages.update_success'));
-      } else {
-        showSuccess(t('token.edit.messages.create_success'));
-        setInputs(originInputs);
-      }
+      showSuccess(t('token.edit.messages.create_success'));
+      setInputs(originInputs);
     } else {
       showError(message);
     }
@@ -199,6 +216,24 @@ const EditToken = () => {
                 autoComplete='new-password'
               />
             </Form.Field>
+            {isEdit && (
+              <Form.Field>
+                <Checkbox
+                  toggle
+                  label={t('token.edit.status_enabled')}
+                  checked={inputs.status === 1}
+                  onChange={(e, { checked }) => {
+                    setInputs((inputs) => ({
+                      ...inputs,
+                      status: checked ? 1 : 2,
+                    }));
+                  }}
+                />
+                <Message size='small'>
+                  {t('token.edit.status_notice')}
+                </Message>
+              </Form.Field>
+            )}
             <Form.Field>
               <Form.Input
                 label={t('token.edit.expire_time')}

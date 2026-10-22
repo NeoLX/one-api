@@ -31,6 +31,8 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 	if err != nil {
 		return nil, fmt.Errorf("setup request header failed: %w", err)
 	}
+	// 自定义头放在适配器默认头之后，刻意覆盖同名头（含 Authorization）
+	ApplyCustomHeaders(req.Header, meta.Config.Headers)
 	resp, err := DoRequest(c, req)
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)

@@ -129,6 +129,16 @@ func TokenAuth() func(c *gin.Context) {
 				return
 			}
 		}
+		// 用户级「代理」白名单：自助配置，只做减法，不会放宽分组范围
+		proxyRules, err := model.CacheGetUserProxyRules(token.UserId)
+		if err != nil {
+			abortWithMessage(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if requestModel != "" && !model.IsModelAllowedByProxy(proxyRules, requestModel) {
+			abortWithMessage(c, http.StatusForbidden, fmt.Sprintf("当前账号（代理）无权使用模型：%s", requestModel))
+			return
+		}
 		c.Set(ctxkey.Id, token.UserId)
 		c.Set(ctxkey.TokenId, token.Id)
 		c.Set(ctxkey.TokenName, token.Name)
