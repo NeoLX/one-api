@@ -14,6 +14,7 @@ import (
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/monitor"
+	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 
 	"github.com/gin-gonic/gin"
@@ -131,6 +132,9 @@ func GetResponseBody(method, url string, channel *model.Channel, headers http.He
 	if err != nil {
 		return nil, err
 	}
+	// 配置解析失败时按零值配置继续，与 distributor / channel-test 的既有处理一致
+	cfg, _ := channel.LoadConfig()
+	adaptor.ApplyCustomHeaders(headers, cfg.Headers)
 	for k := range headers {
 		req.Header.Add(k, headers.Get(k))
 	}
